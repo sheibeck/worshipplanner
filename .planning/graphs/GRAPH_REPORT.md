@@ -1,16 +1,16 @@
 # Graph Report - worshipplanner  (2026-11-07)
 
 ## Corpus Check
-- 2978 files · ~6,883,690 words
+- 2978 files · ~6,812,447 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 37180 nodes · 36404 edges · 3169 communities (2866 shown, 303 thin omitted)
+- 36670 nodes · 35933 edges · 3112 communities (2810 shown, 302 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 90 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `5e6fe1b4`
+- Built from commit: `e0a17dee`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1772,7 +1772,6 @@
 - [[_COMMUNITY_slotTypes.test.ts|slotTypes.test.ts]]
 - [[_COMMUNITY_slug.test.ts|slug.test.ts]]
 - [[_COMMUNITY_vitest.rules.config.ts|vitest.rules.config.ts]]
-- [[_COMMUNITY_08-01-PLAN|08-01-PLAN.md]]
 - [[_COMMUNITY_08-02-PLAN|08-02-PLAN.md]]
 - [[_COMMUNITY_08-03-PLAN|08-03-PLAN.md]]
 - [[_COMMUNITY_09-01-PLAN|09-01-PLAN.md]]
@@ -2859,7 +2858,6 @@
 - [[_COMMUNITY_emit|emit]]
 - [[_COMMUNITY_MiscLabelBadge.test.ts|MiscLabelBadge.test.ts]]
 - [[_COMMUNITY_appConfig.test.ts|appConfig.test.ts]]
-- [[_COMMUNITY_services.rehearsalDefaults.test.ts|services.rehearsalDefaults.test.ts]]
 - [[_COMMUNITY_volunteerAuth.test.ts|volunteerAuth.test.ts]]
 - [[_COMMUNITY_appAuth.test.ts|appAuth.test.ts]]
 - [[_COMMUNITY_orgName.test.ts|orgName.test.ts]]
@@ -2953,7 +2951,6 @@
 - [[_COMMUNITY_FakeFirestore|FakeFirestore]]
 - [[_COMMUNITY_144-UI-REVIEW|144-UI-REVIEW.md]]
 - [[_COMMUNITY_Phase 145 Domain Cutover to worshipbuilder.web.app - Research|Phase 145: Domain Cutover to worshipbuilder.web.app - Research]]
-- [[_COMMUNITY_SlotVideoOutputControl.vue|SlotVideoOutputControl.vue]]
 - [[_COMMUNITY_Phase 145 — Validation Strategy|Phase 145 — Validation Strategy]]
 - [[_COMMUNITY_Milestone v2.13 — Audit PASSED (code); UAT + deploy PENDING|Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING]]
 - [[_COMMUNITY_Common Pitfalls|Common Pitfalls]]
@@ -2977,7 +2974,6 @@
 - [[_COMMUNITY_0247. App home is worshipbuilder.web.app; the old addresses redirect there|0247. App home is worshipbuilder.web.app; the old addresses redirect there]]
 - [[_COMMUNITY_RunChannelHandle|RunChannelHandle]]
 - [[_COMMUNITY_Goal Achievement|Goal Achievement]]
-- [[_COMMUNITY_lockDraft|lockDraft]]
 - [[_COMMUNITY_Tests|Tests]]
 - [[_COMMUNITY_Milestone v2.13 — Audit PASSED (code); UAT + deploy PENDING|Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING]]
 - [[_COMMUNITY_Fixed Issues|Fixed Issues]]
@@ -2990,80 +2986,27 @@
 - [[_COMMUNITY_Milestone v2.15 — Service Times, Vamps & Field Fixes|Milestone: v2.15 — Service Times, Vamps & Field Fixes]]
 - [[_COMMUNITY_Milestone v2.16 — Dated Rehearsals & WorshipBuilder|Milestone: v2.16 — Dated Rehearsals & WorshipBuilder]]
 - [[_COMMUNITY_Project Retrospective|Project Retrospective]]
-- [[_COMMUNITY_Phase 146 Spec Standard - Research|Phase 146: Spec Standard - Research]]
-- [[_COMMUNITY_Requirements WorshipPlanner — Milestone v2.8|Requirements: WorshipPlanner — Milestone v2.8]]
 - [[_COMMUNITY_v1.8 Cost & Billing Hardening — Milestone Audit|v1.8 Cost & Billing Hardening — Milestone Audit]]
-- [[_COMMUNITY_Milestone v2.13 — Audit PASSED (code); UAT + deploy PENDING|Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING]]
-- [[_COMMUNITY_Requirements WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback|Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback]]
 - [[_COMMUNITY_onDuplicate|onDuplicate]]
-- [[_COMMUNITY_Common Pitfalls|Common Pitfalls]]
-- [[_COMMUNITY_Findings by Question|Findings by Question]]
-- [[_COMMUNITY_v2.4 — Run the Service (Live Presentation) — SHIPPED 2026-08-30|v2.4 — Run the Service (Live Presentation) — SHIPPED 2026-08-30]]
-- [[_COMMUNITY_Architecture Patterns|Architecture Patterns]]
-- [[_COMMUNITY_Code Examples|Code Examples]]
-- [[_COMMUNITY_Validation Architecture|Validation Architecture]]
-- [[_COMMUNITY_Standard Stack|Standard Stack]]
-- [[_COMMUNITY_User Constraints (from CONTEXT.md)|User Constraints (from CONTEXT.md)]]
-- [[_COMMUNITY_Sources|Sources]]
-- [[_COMMUNITY_Security Domain|Security Domain]]
-- [[_COMMUNITY_146-01-PLAN|146-01-PLAN.md]]
-- [[_COMMUNITY_slideGroups.ts|slideGroups.ts]]
 - [[_COMMUNITY_Spec Feature name|Spec: <Feature name>]]
 - [[_COMMUNITY_0148. Via enterOrgAsSuperAdmin, with NO membership document of their own|0148. Via enterOrgAsSuperAdmin, with NO membership document of their own]]
 - [[_COMMUNITY_0248. Feature specs are the source of truth; tests cite criteria in their titles|0248. Feature specs are the source of truth; tests cite criteria in their titles]]
-- [[_COMMUNITY_Warnings|Warnings]]
-- [[_COMMUNITY_Pattern Assignments|Pattern Assignments]]
 - [[_COMMUNITY_Acceptance criteria|Acceptance criteria]]
-- [[_COMMUNITY_Implementation Decisions|Implementation Decisions]]
-- [[_COMMUNITY_Spec Default rehearsal day and time|Spec: Default rehearsal day and time]]
-- [[_COMMUNITY_Phase 147 — UI Design Contract|Phase 147 — UI Design Contract]]
-- [[_COMMUNITY_Fixed Issues|Fixed Issues]]
-- [[_COMMUNITY_Phase 147 Default Rehearsal Day and Time - Research|Phase 147: Default Rehearsal Day and Time - Research]]
-- [[_COMMUNITY_Observable Truths (ROADMAP success criteria)|Observable Truths (ROADMAP success criteria)]]
-- [[_COMMUNITY_147-04-PLAN|147-04-PLAN.md]]
-- [[_COMMUNITY_Locked Decisions|Locked Decisions]]
-- [[_COMMUNITY_Phase 147 — Validation Strategy|Phase 147 — Validation Strategy]]
-- [[_COMMUNITY_Tests|Tests]]
-- [[_COMMUNITY_147-05-PLAN|147-05-PLAN.md]]
-- [[_COMMUNITY_Common Pitfalls|Common Pitfalls]]
-- [[_COMMUNITY_Question-by-Question Findings|Question-by-Question Findings]]
-- [[_COMMUNITY_Phase 146 — Security|Phase 146 — Security]]
-- [[_COMMUNITY_147-02-PLAN|147-02-PLAN.md]]
-- [[_COMMUNITY_147-03-PLAN|147-03-PLAN.md]]
-- [[_COMMUNITY_Architecture Patterns|Architecture Patterns]]
-- [[_COMMUNITY_Code Examples|Code Examples]]
-- [[_COMMUNITY_Validation Architecture|Validation Architecture]]
-- [[_COMMUNITY_Sources|Sources]]
-- [[_COMMUNITY_Standard Stack|Standard Stack]]
-- [[_COMMUNITY_Security Domain|Security Domain]]
-- [[_COMMUNITY_song.ts|song.ts]]
-- [[_COMMUNITY_slideGroups.ts|slideGroups.ts]]
-- [[_COMMUNITY_Phase 147 Plan 01 Default Rehearsal Spec Summary|Phase 147 Plan 01: Default Rehearsal Spec Summary]]
-- [[_COMMUNITY_songs.ts|songs.ts]]
-- [[_COMMUNITY_Milestone v2.13 — Audit PASSED (code); UAT + deploy PENDING|Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING]]
-- [[_COMMUNITY_Phase 147 Plan 04 Settings day control and add-form default date Summary|Phase 147 Plan 04: Settings day control and add-form default date Summary]]
 - [[_COMMUNITY_0108. The fresh-base write (T-26-05-01, 26-RESEARCH.md Pattern 2Pitfall 2)|0108. The fresh-base write (T-26-05-01, 26-RESEARCH.md Pattern 2/Pitfall 2)]]
 - [[_COMMUNITY_0249. New services start with a default rehearsal that follows the service date|0249. New services start with a default rehearsal that follows the service date]]
-- [[_COMMUNITY_Requirements WorshipPlanner — Milestone v2.8|Requirements: WorshipPlanner — Milestone v2.8]]
 - [[_COMMUNITY_defaultRehearsalAdr.test.ts|defaultRehearsalAdr.test.ts]]
-- [[_COMMUNITY_Detailed Findings|Detailed Findings]]
-- [[_COMMUNITY_Phase 147 — Security|Phase 147 — Security]]
 - [[_COMMUNITY_song.ts|song.ts]]
 - [[_COMMUNITY_slideGroups.ts|slideGroups.ts]]
-- [[_COMMUNITY_Phase 147 Code Review Report|Phase 147: Code Review Report]]
-- [[_COMMUNITY_Phase 147 Code Review Fix Report|Phase 147: Code Review Fix Report]]
-- [[_COMMUNITY_Phase 147 Code Review Fix Report|Phase 147: Code Review Fix Report]]
 - [[_COMMUNITY_data|data]]
 - [[_COMMUNITY_services.rehearsalDefaults.test.ts|services.rehearsalDefaults.test.ts]]
 - [[_COMMUNITY_SettingsView.defaultsWrites.test.ts|SettingsView.defaultsWrites.test.ts]]
 - [[_COMMUNITY_roster.ts|roster.ts]]
 - [[_COMMUNITY_songs.ts|songs.ts]]
 - [[_COMMUNITY_SlotVideoOutputControl.vue|SlotVideoOutputControl.vue]]
-- [[_COMMUNITY_v2.17 Milestone Audit — Spec-Driven Foundation & Rehearsal Defaults|v2.17 Milestone Audit — Spec-Driven Foundation & Rehearsal Defaults]]
 - [[_COMMUNITY_dropRouting.ts|dropRouting.ts]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Communities (3166 total, 304 thin omitted)` - 2741 edges
+1. `Communities (3169 total, 303 thin omitted)` - 2744 edges
 2. `Bucket B — Behavioral/Architectural` - 117 edges
 3. `Bucket A — Decision-Rationale` - 95 edges
 4. `Project State` - 57 edges
@@ -3072,28 +3015,28 @@
 7. `Pending Human Verification — v1.4` - 38 edges
 8. `WorshipBuilder (formerly WorshipPlanner)` - 30 edges
 9. `Utils Behavioral Notes (R318)` - 29 edges
-10. `getAppConfig()` - 26 edges
+10. `Milestones` - 27 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `backfillOrgMembershipClaims()` --indirect_call--> `memberships()`  [INFERRED]
   functions/src/backfillOrgClaims.ts → src/components/__tests__/AppSidebar.test.ts
 - `sendQueuedMessageHandler()` --indirect_call--> `data()`  [INFERRED]
   functions/src/index.ts → src/views/__tests__/ServiceEditorView.test.ts
+- `serviceTimesLabel()` --indirect_call--> `isDisplayableRehearsal()`  [INFERRED]
+  src/views/DashboardView.vue → src/utils/rehearsalTimes.ts
 - `mockConfig()` --indirect_call--> `getAppConfig()`  [INFERRED]
   functions/src/adminEmail.test.ts → functions/src/appConfig.ts
 - `enableBackgroundCleanup()` --indirect_call--> `getAppConfig()`  [INFERRED]
-  functions/src/index.test.ts → functions/src/appConfig.ts
-- `enablePptxSourceCleanup()` --indirect_call--> `getAppConfig()`  [INFERRED]
   functions/src/index.test.ts → functions/src/appConfig.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (3169 total, 303 thin omitted)
+## Communities (3112 total, 302 thin omitted)
 
 ### Community 0 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.00
-Nodes (2741): Communities (3166 total, 304 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2733 more)
+Nodes (2744): Communities (3169 total, 303 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2736 more)
 
 ### Community 1 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.02
@@ -3273,8 +3216,8 @@ Cohesion: 0.04
 Nodes (46): addSlotAsItem — title modification (SONG and HYMN cases), Anti-Patterns to Avoid, Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Claude's Discretion, Code Examples, Common Pitfalls (+38 more)
 
 ### Community 41 - "service.ts"
-Cohesion: 0.14
-Nodes (20): ScriptureReading, HymnSlot, ImportedSlot, MediaAttachableSlot, NonAssignableSlot, Progression, ScriptureRef, ScriptureSlot (+12 more)
+Cohesion: 0.13
+Nodes (21): ScriptureReading, HymnSlot, ImportedSlot, MediaAttachableSlot, NonAssignableSlot, Progression, ScriptureRef, ScriptureSlot (+13 more)
 
 ### Community 42 - "Phase 16.1: Song list tags & columns customization - Research"
 Cohesion: 0.04
@@ -3820,7 +3763,7 @@ Nodes (15): {
 
 ### Community 175 - "DashboardView.vue"
 Cohesion: 0.06
-Nodes (27): { activeEditors }, activeSongs, attentionServices, authStore, displayName, extraUnconfirmedCount, missingCcliCount, missingKeyCount (+19 more)
+Nodes (28): { activeEditors }, activeSongs, attentionServices, authStore, displayName, extraUnconfirmedCount, missingCcliCount, missingKeyCount (+20 more)
 
 ### Community 176 - "Architecture"
 Cohesion: 0.11
@@ -4172,11 +4115,11 @@ Nodes (11): FieldSaveState, fieldStates, fromAddressLive, fromAddressValid, from
 
 ### Community 263 - "Phase 16 Plan 11: Remove Deprecated Frequency Fields Summary"
 Cohesion: 0.11
-Nodes (19): ASSIGNMENTS, { mockOnSnapshot, snapshotCallbacks, mockUnsubscribe, mockSetDoc, mockDeleteDoc, emailState }, TWO_ASSIGNMENTS, AggregateStatus, clearAll(), confirmations, error, myEmailLower (+11 more)
+Nodes (18): ASSIGNMENTS, { mockOnSnapshot, snapshotCallbacks, mockUnsubscribe, mockSetDoc, mockDeleteDoc, emailState }, TWO_ASSIGNMENTS, AggregateStatus, clearAll(), confirmations, error, myEmailLower (+10 more)
 
 ### Community 264 - "Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary"
-Cohesion: 0.11
-Nodes (11): calls, createFakeChannel(), FakeWin, H, mockRouterPush, mountView(), openedWins, PostedMessage (+3 more)
+Cohesion: 0.12
+Nodes (10): calls, createFakeChannel(), FakeWin, H, mockRouterPush, mountView(), openedWins, PostedMessage (+2 more)
 
 ### Community 265 - "Phase 17: Sync schedule with planned services - Research"
 Cohesion: 0.11
@@ -7755,7 +7698,7 @@ Nodes (11): IN-01: `team.ts`'s "zero behavior change" doc comment overstates wha
 
 ### Community 1141 - "Milestones"
 Cohesion: 0.05
-Nodes (35): Known Deferred, Known Deferred, Known Gaps, Milestones, v1.0 MVP (Shipped: 2026-03-05), v1.1 (Shipped: 2026-07-24), v1.2 Worship Service Slide Management (Shipped: 2026-07-28), v1.3 Slides Tab Rework (Shipped: 2026-07-28) (+27 more)
+Nodes (36): Known Deferred, Known Deferred, Known Gaps, Milestones, v1.0 MVP (Shipped: 2026-03-05), v1.1 (Shipped: 2026-07-24), v1.2 Worship Service Slide Management (Shipped: 2026-07-28), v1.3 Slides Tab Rework (Shipped: 2026-07-28) (+28 more)
 
 ### Community 1142 - "Data Shape Decisions (Claude's Discretion — Researched)"
 Cohesion: 0.40
@@ -9691,16 +9634,16 @@ Cohesion: 0.29
 Nodes (7): BouncedRecipient, mapMessageDoc(), num(), ServiceMessageDeliveryCounts, ServiceMessageDoc, ServiceMessageStatus, ServiceMessageType
 
 ### Community 1664 - "09-01-PLAN.md"
-Cohesion: 0.20
-Nodes (18): ADR-0245, Service, buildAutoRehearsal(), formatRehearsalDateShort(), formatWallClockTime(), isRealYmd(), mostRecentWeekdayOnOrBefore(), moveAutoRehearsals() (+10 more)
+Cohesion: 0.19
+Nodes (20): ADR-0245, buildServiceSnapshot(), buildAutoRehearsal(), formatRehearsalDateShort(), formatWallClockTime(), isDisplayableRehearsal(), isRealYmd(), mostRecentWeekdayOnOrBefore() (+12 more)
 
 ### Community 1665 - "09-02-PLAN.md"
 Cohesion: 0.25
 Nodes (7): NotificationAction, NotificationLink, NotificationVariant, PushOptions, StickyOptions, Toast, useToasts
 
 ### Community 1666 - "09-03-PLAN.md"
-Cohesion: 0.20
-Nodes (11): buildServiceSnapshot(), isDisplayableRehearsal(), toPublicRehearsal(), buildRehearseAccess(), distinctSongSlots(), RehearseAccessDoc, RehearseAttachment, RehearseRoleAssignment (+3 more)
+Cohesion: 0.29
+Nodes (7): buildRehearseAccess(), distinctSongSlots(), RehearseAccessDoc, RehearseAttachment, RehearseRoleAssignment, RehearseSong, ADR-0160
 
 ### Community 1668 - "10-02-PLAN.md"
 Cohesion: 0.29
@@ -10125,10 +10068,6 @@ Nodes (6): 0106. ConfirmDiscard() is instantiated below (unsavedGuard, Task 3), 
 ### Community 1773 - "vitest.rules.config.ts"
 Cohesion: 0.29
 Nodes (6): 0107. Flips the selected section entry's speaker to the next one in the, Consequences, Context, Decision, Source comments, Status
-
-### Community 1811 - "08-01-PLAN.md"
-Cohesion: 0.17
-Nodes (11): Accomplishments, Deviations from Plan, Known Stubs, Open for /gsd-verify-work, Performance, Phase 146 Plan 02: Spec Template, Rule and Rationale Summary, RED Run Before the Docs Existed, Self-Check: PASSED (+3 more)
 
 ### Community 1812 - "08-02-PLAN.md"
 Cohesion: 0.29
@@ -13434,10 +13373,6 @@ Nodes (3): clearSongEditQueryParam(), openSongEditRequest(), resolveSongEditRequ
 Cohesion: 0.11
 Nodes (18): Allowlists (R450), Amendment 2 — owner scope cut 2026-10-27 (authoritative; supersedes the bridge, receiving-side and hand-off text above), Amendment — research-driven decisions (2026-10-27, recommendations auto-accepted), Claude's Discretion, Deferred Ideas, Established Patterns, Existing Code Insights, Google sign-in safety (R451) (+10 more)
 
-### Community 2910 - "services.rehearsalDefaults.test.ts"
-Cohesion: 0.12
-Nodes (15): Anti-Patterns Found, Behavioral Spot-Checks (run by me, this session), CONTEXT decisions honored, Gaps Summary, Goal Achievement, Human Verification Required, Key Links, Observable Truths (ROADMAP success criteria) (+7 more)
-
 ### Community 2970 - "Phase 141 — UI Review"
 Cohesion: 0.29
 Nodes (7): Common Pitfalls, Pitfall 1: `useVampStore` is never subscribed on the path that needs it, Pitfall 2: Subscribing `vamps` ungated throws permission-denied for viewers, Pitfall 3: The ♪ badge cannot be read off `AssembledSlide` — it isn't there, Pitfall 4: Writing the arm/blocked state machine as if slide-change and blackout are independent, Pitfall 5: `RunPreviewPair.vue`'s own embedded `SlideCanvas`/`AudioPlayer` is a harmless-but-confusing, Pitfall 6: Conflating "output" with "Run control window" when reading the older v2.15 research
@@ -13778,10 +13713,6 @@ Nodes (5): Artifacts this phase produces, Batched human UAT (milestone-end, PEND
 Cohesion: 0.33
 Nodes (6): Human/visual items to defer (milestone-end batched UAT, mark PENDING not accepted), Phase Requirements → Test Map, Sampling Rate, Test Framework, Validation Architecture, Wave 0 Gaps
 
-### Community 3060 - "SlotVideoOutputControl.vue"
-Cohesion: 0.13
-Nodes (14): Claude's Discretion, Decided earlier (owner, 2026-11-06; do not reopen), Deferred Ideas, Established Patterns, Existing Code Insights, Implementation Decisions, Integration Points, Phase 146: Spec Standard - Context (+6 more)
-
 ### Community 3061 - "Phase 145 — Validation Strategy"
 Cohesion: 0.33
 Nodes (5): Fixes Applied (orchestrator, 2026-10-27, owner pre-approved recommendations), Not changed (recorded), Phase 143 — UI Review, Pillar Scores (as audited, before fixes), Still needs human verification (batched)
@@ -13870,10 +13801,6 @@ Nodes (4): Claude's Discretion, Deferred Ideas (OUT OF SCOPE), Locked Decisions,
 Cohesion: 0.50
 Nodes (4): Primary (HIGH confidence), Secondary (MEDIUM confidence), Sources, Tertiary (LOW confidence)
 
-### Community 3084 - "lockDraft"
-Cohesion: 0.13
-Nodes (14): Accomplishments, Auto-fixed Issues, Deviations from Plan, Gate results, Human checks pending, Issues Encountered, Known Stubs, Next Phase Readiness (+6 more)
-
 ### Community 3085 - "Tests"
 Cohesion: 0.67
 Nodes (3): Applicable ASVS Categories, Known Threat Patterns for this stack, Security Domain
@@ -13914,77 +13841,13 @@ Nodes (7): Cost Observations, Key Lessons, Milestone: v2.16 — Dated Rehearsals
 Cohesion: 0.40
 Nodes (4): Cross-Milestone Trends, Process Evolution, Project Retrospective, Top Lessons (Verified Across Milestones)
 
-### Community 3097 - "Phase 146: Spec Standard - Research"
-Cohesion: 0.15
-Nodes (12): Architectural Responsibility Map, Assumptions Log, Don't Hand-Roll, Environment Availability, Metadata, Open Questions (RESOLVED), Package Legitimacy Audit, Phase 146: Spec Standard - Research (+4 more)
-
-### Community 3098 - "Requirements: WorshipPlanner — Milestone v2.8"
-Cohesion: 0.18
-Nodes (10): Commits, Deviations from Plan, Known Stubs, Notes for later plans, Phase 147 Plan 02: Rehearsal primitives Summary, Residual check, Self-Check: PASSED, Threat Flags (+2 more)
-
 ### Community 3099 - "v1.8 Cost & Billing Hardening — Milestone Audit"
 Cohesion: 0.09
 Nodes (27): callee(), checkSpecCoverage(), Citations, extractCitations(), findTestFiles(), hasOnly(), hasRunnableBody(), isEffective() (+19 more)
 
-### Community 3100 - "Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING"
-Cohesion: 0.13
-Nodes (14): Canonical rule sentence parity (R455, R458), `CLAUDE.md` (modify), `docs/specs/TEMPLATE.md` (doc template), File Classification, Line endings, Metadata, No Analog Found, Pattern Assignments (+6 more)
-
-### Community 3101 - "Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback"
-Cohesion: 0.18
-Nodes (10): audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117), Manual-Only Verifications, Per-Task Verification Map, Phase 146 — Validation Strategy, Sampling Rate, status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6), Test Infrastructure, Validation Audit 2026-11-06 (+2 more)
-
 ### Community 3102 - "onDuplicate"
 Cohesion: 0.25
 Nodes (9): confirmRemove(), expandRowKey(), isExpanded(), mintSlotId(), onAddSection(), onDuplicate(), onRemove(), orderIndexForRow() (+1 more)
-
-### Community 3103 - "Common Pitfalls"
-Cohesion: 0.25
-Nodes (8): Common Pitfalls, Pitfall 1: The check's own test file cites unknown IDs, Pitfall 2: Timeout under a loaded suite, Pitfall 3: `noUncheckedIndexedAccess` breaks verbatim JS, Pitfall 4: eslint on `src/**/__tests__/*`, Pitfall 5: CRLF in CLAUDE.md / PROJECT.md when editing, Pitfall 6: The intentional failing window leaks into other gates, Pitfall 7: Static proof only
-
-### Community 3104 - "Findings by Question"
-Cohesion: 0.29
-Nodes (7): Findings by Question, Q1 - Regex vs parser: use the parser, with a prefilter, Q2 - Fixtures: nothing in the repo that any tool can see, Q3 - Which files the check reads, Q4 - Anything else that sees `docs/specs/` or line endings, Q5 - Spec-parsing rules (all verified in a node script, LF and CRLF), Q6 - `PROJECT.md` and milestone close
-
-### Community 3105 - "v2.4 — Run the Service (Live Presentation) — SHIPPED 2026-08-30"
-Cohesion: 0.29
-Nodes (6): Artifacts this phase produces, Edge coverage resolution, Flagged assumptions, STRIDE Threat Register, Trust Boundaries, Verbatim text
-
-### Community 3106 - "Architecture Patterns"
-Cohesion: 0.33
-Nodes (6): Anti-Patterns to Avoid, Architecture Patterns, Pattern 1: Title-only citation extraction (Q1), Pattern 2: Fixtures as strings and a temp tree (Q2), Recommended Project Structure, System Architecture Diagram
-
-### Community 3107 - "Code Examples"
-Cohesion: 0.33
-Nodes (6): `checkSpecCoverage` rules (JS-verified), CLAUDE.md / PROJECT.md rule (one canonical sentence, quoted verbatim in both), Code Examples, `extractCitations` core (JS-verified), Pure function shapes (`src/__tests__/specCoverage.ts`), Template skeleton for `docs/specs/TEMPLATE.md` (R454, R456)
-
-### Community 3108 - "Validation Architecture"
-Cohesion: 0.40
-Nodes (5): Phase Requirements to Test Map, Sampling Rate, Test Framework, Validation Architecture, Wave 0 Gaps
-
-### Community 3109 - "Standard Stack"
-Cohesion: 0.50
-Nodes (4): Alternatives Considered, Core, Standard Stack, Supporting
-
-### Community 3110 - "User Constraints (from CONTEXT.md)"
-Cohesion: 0.50
-Nodes (4): Claude's Discretion, Deferred Ideas (OUT OF SCOPE), Locked Decisions, User Constraints (from CONTEXT.md)
-
-### Community 3111 - "Sources"
-Cohesion: 0.50
-Nodes (4): Primary (HIGH confidence, executed against this repo), Secondary (MEDIUM confidence), Sources, Tertiary (LOW confidence)
-
-### Community 3112 - "Security Domain"
-Cohesion: 0.67
-Nodes (3): Applicable ASVS Categories, Known Threat Patterns, Security Domain
-
-### Community 3113 - "146-01-PLAN.md"
-Cohesion: 0.33
-Nodes (5): Artifacts this phase produces, Edge coverage resolution, Flagged assumptions, STRIDE Threat Register, Trust Boundaries
-
-### Community 3114 - "slideGroups.ts"
-Cohesion: 0.14
-Nodes (13): Accomplishments, Auto-fixed Issues, Deviations from Plan, Issues Encountered, Known Stubs, Next Plan Readiness, Performance, Phase 146 Plan 01: Spec Coverage Check Summary (+5 more)
 
 ### Community 3115 - "Spec: <Feature name>"
 Cohesion: 0.20
@@ -13998,129 +13861,9 @@ Nodes (6): 0148. Via enterOrgAsSuperAdmin, with NO membership document of their 
 Cohesion: 0.29
 Nodes (6): 0248. Feature specs are the source of truth; tests cite criteria in their titles, Consequences, Context, Decision, Source comments, Status
 
-### Community 3118 - "Warnings"
-Cohesion: 0.40
-Nodes (4): Phase 146: Code Review Report (final round), Summary, Warnings, WR-01: A criterion written without its list marker is silently dropped when it directly follows another item
-
-### Community 3119 - "Pattern Assignments"
-Cohesion: 0.10
-Nodes (20): Editor handler gate, Existence-guarded delete, File Classification, Metadata, No Analog Found, Org settings write, Pattern Assignments, Phase 147: Default Rehearsal Day and Time - Pattern Map (+12 more)
-
 ### Community 3120 - "Acceptance criteria"
 Cohesion: 0.11
 Nodes (17): Acceptance criteria, ADRs, Behavior, Edge cases, Moving a service, New services, Out of scope, Purpose (+9 more)
-
-### Community 3121 - "Implementation Decisions"
-Cohesion: 0.11
-Nodes (17): ADR, Claude's Discretion, Decided earlier (owner, 2026-11-06; do not reopen), Deferred Ideas, Established Patterns, Existing Code Insights, Implementation Decisions, Integration Points (+9 more)
-
-### Community 3122 - "Spec: Default rehearsal day and time"
-Cohesion: 0.12
-Nodes (16): Artifacts this phase produces, Criterion ownership, Edge coverage resolution, Moving a service, New services, Prohibition recall, Read-only views, Saving a date change (+8 more)
-
-### Community 3123 - "Phase 147 — UI Design Contract"
-Cohesion: 0.13
-Nodes (14): 1. Settings: "Default rehearsal day" select (new), 2. Settings: help text (replaced), 3. Times tab: add-rehearsal form Date input (value only), 4. Times tab: rehearsal rows (no change), Checker Sign-Off, Color, Component Contract, Copywriting Contract (+6 more)
-
-### Community 3124 - "Fixed Issues"
-Cohesion: 0.50
-Nodes (3): Fixed Issues, Phase 146: Code Review Fix Report, WR-01: A criterion written without its list marker is silently dropped when it directly follows another item
-
-### Community 3125 - "Phase 147: Default Rehearsal Day and Time - Research"
-Cohesion: 0.14
-Nodes (13): Architectural Responsibility Map, Assumptions Log, Don't Hand-Roll, Draft Acceptance Criteria, Environment Availability, Metadata, Open Questions (RESOLVED), Package Legitimacy Audit (+5 more)
-
-### Community 3126 - "Observable Truths (ROADMAP success criteria)"
-Cohesion: 0.18
-Nodes (10): Anti-Patterns, Gate runs (run for real, on current HEAD e3430edc), Human Verification Required, Key Links, Known, documented limits (not gaps), Notes for the orchestrator, Observable Truths (ROADMAP success criteria), Phase 146: Spec Standard Verification Report (+2 more)
-
-### Community 3127 - "147-04-PLAN.md"
-Cohesion: 0.20
-Nodes (9): Artifacts this phase produces, Flagged assumptions, Line endings, STRIDE Threat Register, The red window, The residual check, Trust Boundaries, UI Considerations resolved (+1 more)
-
-### Community 3128 - "Locked Decisions"
-Cohesion: 0.20
-Nodes (10): ADR, Claude's Discretion, Decided earlier (owner, 2026-11-06; do not reopen), Deferred Ideas (OUT OF SCOPE), Locked Decisions, Moving a service, Settings and what planners see, Spec-first order (+2 more)
-
-### Community 3129 - "Phase 147 — Validation Strategy"
-Cohesion: 0.18
-Nodes (10): audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117), Manual-Only Verifications, Per-Task Verification Map, Phase 147 — Validation Strategy, Sampling Rate, status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6), Test Infrastructure, Validation Audit 2026-11-07 (+2 more)
-
-### Community 3130 - "Tests"
-Cohesion: 0.22
-Nodes (8): 1. The check has no way to pass without a real citation, 2. A green check is never described as proof a test ran, 3. The rollout wording doesn't block existing features, 4. The UI exception isn't widened, Current Test, Gaps, Summary, Tests
-
-### Community 3131 - "147-05-PLAN.md"
-Cohesion: 0.22
-Nodes (8): Artifacts this phase produces, Flagged assumptions, Line endings, Owner decisions, STRIDE Threat Register, The red window, The residual check, Trust Boundaries
-
-### Community 3132 - "Common Pitfalls"
-Cohesion: 0.22
-Nodes (9): Common Pitfalls, Pitfall 1: The service date is never sent by `onSave`, Pitfall 2: Projection spread leaks the marker, Pitfall 3: Shell `TZ=` is silently ignored on this machine, Pitfall 4: Autosave swallows the first mutation, Pitfall 5: `0` is a valid weekday, Pitfall 6: Time default can create a date-only row, Pitfall 7: Test mocks lack the new setting (+1 more)
-
-### Community 3133 - "Question-by-Question Findings"
-Cohesion: 0.22
-Nodes (9): Q1. Every place a rehearsal row is copied, rebuilt or read, Q2. Every way a service date changes, Q3. Autosave interaction, Q4. Org settings path, Q5. Timezone-safe weekday maths, Q6. Acceptance criteria, Q7. The red window, Q8. What changes on purpose (+1 more)
-
-### Community 3134 - "Phase 146 — Security"
-Cohesion: 0.25
-Nodes (7): Accepted Risks Log, Phase 146 — Security, Security Audit Trail, Sign-Off, Threat Register, threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate), Trust Boundaries
-
-### Community 3135 - "147-02-PLAN.md"
-Cohesion: 0.25
-Nodes (7): Artifacts this phase produces, Flagged assumptions, Line endings, STRIDE Threat Register, The red window, The residual check, Trust Boundaries
-
-### Community 3136 - "147-03-PLAN.md"
-Cohesion: 0.25
-Nodes (7): Artifacts this phase produces, Flagged assumptions, Line endings, STRIDE Threat Register, The red window, The residual check, Trust Boundaries
-
-### Community 3137 - "Architecture Patterns"
-Cohesion: 0.25
-Nodes (8): Anti-Patterns to Avoid, Architecture Patterns, Pattern 1: Row flag, shared narrowing (the marker), Pattern 2: Timezone-free calendar arithmetic, Pattern 3: Pure move with dedupe (the util the editor calls), Pattern 4: Add-form default date (mirror of `newTime`), Recommended Project Structure, System Architecture Diagram
-
-### Community 3138 - "Code Examples"
-Cohesion: 0.40
-Nodes (5): Auto-add inside `createService`, Code Examples, Editor handlers, Narrowing in both builders, Settings save (extends the existing handler)
-
-### Community 3139 - "Validation Architecture"
-Cohesion: 0.40
-Nodes (5): Phase Requirements -> Test Map, Sampling Rate, Test Framework, Validation Architecture, Wave 0 Gaps
-
-### Community 3140 - "Sources"
-Cohesion: 0.50
-Nodes (4): Primary (HIGH confidence), Secondary (MEDIUM confidence), Sources, Tertiary (LOW confidence)
-
-### Community 3141 - "Standard Stack"
-Cohesion: 0.67
-Nodes (3): Alternatives Considered, Core, Standard Stack
-
-### Community 3142 - "Security Domain"
-Cohesion: 0.67
-Nodes (3): Applicable ASVS Categories, Known Threat Patterns for this stack, Security Domain
-
-### Community 3143 - "song.ts"
-Cohesion: 0.18
-Nodes (10): 1. A date change survives a reload and retires the old public page, 2. The Settings dropdown fits at phone width, 3. Choosing None saves and survives a reload, 4. The marker never reaches a public view, 5. Old-page removal only removes this service's own page, 6. A planner-changed rehearsal is never moved or overwritten, Current Test, Gaps (+2 more)
-
-### Community 3144 - "slideGroups.ts"
-Cohesion: 0.25
-Nodes (7): Do the failed-save rollback and the watch fight? No., Does the watch fire when nothing about the card changed? No., Fix verification, Phase 147: Code Review Report (re-review, `e1693a94..HEAD`), Summary, Warnings, WR-01: After "Save defaults", the time inputs are the same array as the store, so unsaved edits change the live defaults
-
-### Community 3145 - "Phase 147 Plan 01: Default Rehearsal Spec Summary"
-Cohesion: 0.33
-Nodes (5): Deviations from Plan, Notes, Phase 147 Plan 01: Default Rehearsal Spec Summary, Self-Check: PASSED, Verification
-
-### Community 3146 - "songs.ts"
-Cohesion: 0.50
-Nodes (3): Fixed Issues, Phase 147: Code Review Fix Report, WR-01: After "Save defaults", the time inputs are the same array as the store, so unsaved edits change the live defaults
-
-### Community 3147 - "Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING"
-Cohesion: 0.17
-Nodes (11): Auto-fixed Issues, Commits, Deviations from Plan, Known Stubs, Phase 147 Plan 03: createService default rehearsal and old-page retirement Summary, Residual check, Self-Check: PASSED, Threat Flags (+3 more)
-
-### Community 3148 - "Phase 147 Plan 04: Settings day control and add-form default date Summary"
-Cohesion: 0.17
-Nodes (11): Auto-fixed Issues, Commits, Deviations from Plan, Known Stubs, Notes for Plan 05, Pending human check, Phase 147 Plan 04: Settings day control and add-form default date Summary, Plan text versus outcome (+3 more)
 
 ### Community 3149 - "0108. The fresh-base write (T-26-05-01, 26-RESEARCH.md Pattern 2/Pitfall 2)"
 Cohesion: 0.29
@@ -14130,14 +13873,6 @@ Nodes (6): 0108. The fresh-base write (T-26-05-01, 26-RESEARCH.md Pattern 2/Pitf
 Cohesion: 0.29
 Nodes (6): 0249. New services start with a default rehearsal that follows the service date, Consequences, Context, Decision, Source comments, Status
 
-### Community 3153 - "Detailed Findings"
-Cohesion: 0.14
-Nodes (13): Detailed Findings, Files Audited, Out of Scope (noted, not scored), Phase 147 — UI Review, Pillar 1: Copywriting (3/4), Pillar 2: Visuals (3/4), Pillar 3: Color (4/4), Pillar 4: Typography (4/4) (+5 more)
-
-### Community 3154 - "Phase 147 — Security"
-Cohesion: 0.25
-Nodes (7): Accepted Risks Log, Phase 147 — Security, Security Audit Trail, Sign-Off, Threat Register, threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate), Trust Boundaries
-
 ### Community 3155 - "song.ts"
 Cohesion: 0.25
 Nodes (7): Arrangement, Song, SongAttachment, SongAttachmentKind, SongAttachmentLinkSource, UpsertSongInput, VW_TYPE_LABELS
@@ -14146,21 +13881,9 @@ Nodes (7): Arrangement, Song, SongAttachment, SongAttachmentKind, SongAttachment
 Cohesion: 0.40
 Nodes (4): ADR-0167, ADR-0168, ADR-0169, ADR-0170
 
-### Community 3157 - "Phase 147: Code Review Report"
-Cohesion: 0.22
-Nodes (8): IN-01: `buildAutoRehearsal` accepts any `HH:mm`-shaped time, such as `99:99`, Info, Phase 147: Code Review Report, Summary, Warnings, WR-01: The in-place church switch reseeds only the weekday, so "Save defaults" writes the old church's times into the new church, WR-02: Every autosave now sends `date` and the whole `rehearsals` array, so a stale second tab reverts a date change and the moved rehearsal, WR-03: The AC-RHD-10 test is tautological
-
-### Community 3158 - "Phase 147: Code Review Fix Report"
-Cohesion: 0.50
-Nodes (3): Fixed Issues, Phase 147: Code Review Fix Report, WR-01: After "Save defaults", the time inputs are the same array as the store, so unsaved edits change the live defaults
-
-### Community 3159 - "Phase 147: Code Review Fix Report"
-Cohesion: 0.25
-Nodes (7): Fixed Issues, Phase 147: Code Review Fix Report, Skipped Issues, Verification, WR-01: In-place church switch reseeds only the weekday, WR-02: Stale second tab reverts a date change and the moved rehearsal, WR-03: The AC-RHD-09 and AC-RHD-10 tests could not fail
-
 ### Community 3160 - "data"
-Cohesion: 0.60
-Nodes (4): driveRoundTrip(), makeView(), orgId, pick()
+Cohesion: 0.38
+Nodes (6): driveRoundTrip(), makeSharedStore(), makeView(), orgId, pick(), data()
 
 ### Community 3161 - "services.rehearsalDefaults.test.ts"
 Cohesion: 0.40
@@ -14170,28 +13893,24 @@ Nodes (4): create(), mockAuthState, Row, ADR-0249
 Cohesion: 0.20
 Nodes (9): emit, mode, props, select(), sizeHint, SlotVideoOutput, mountControl(), slot() (+1 more)
 
-### Community 3166 - "v2.17 Milestone Audit — Spec-Driven Foundation & Rehearsal Defaults"
-Cohesion: 0.20
-Nodes (9): Definition of done, End-to-end flows, Evidence, Integration, Not verified, Phases, Requirements (3-source cross-reference), Tech debt (+1 more)
-
 ### Community 3168 - "dropRouting.ts"
 Cohesion: 0.39
 Nodes (7): ClassifiedFiles, classifyFiles(), isPptxFile(), NATURAL_ORDER_COLLATOR, ResolvedDrop, resolveDrop(), file()
 
 ## Knowledge Gaps
-- **27437 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+27432 more)
+- **27043 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+27038 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **303 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **302 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Communities (3166 total, 304 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
-  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+- **Why does `Communities (3169 total, 303 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
+  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _27440 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _27046 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
-  _Cohesion score 0.0007296607077708865 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0007288629737609329 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.017094017094017096 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
