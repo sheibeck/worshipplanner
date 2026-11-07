@@ -1,8 +1,8 @@
 {
-  "ts": "2026-10-27T23:23:21Z",
-  "status": "running",
-  "exit_code": null,
-  "duration_ms": null,
-  "head_at_build": "3163138a79523d6146b90797beabeea2605698b0",
+  "ts": "2026-11-07T13:22:39Z",
+  "status": "ok",
+  "exit_code": 0,
+  "duration_ms": 289366,
+  "head_at_build": "0506680392092784f13445c56986169f39b131bf",
   "graphify_version": null
 }
