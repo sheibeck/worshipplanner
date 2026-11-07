@@ -2,7 +2,7 @@
 
 **Code:** RHD
 **Status:** Active
-**Last changed:** 2026-11-06
+**Last changed:** 2026-11-07
 
 ## Purpose
 
@@ -34,6 +34,7 @@ The marker is internal. In the Times tab an auto-added rehearsal looks like any 
 - **AC-RHD-69** - After a save, typing in the default time fields changes nothing in the church's settings until "Save defaults" is pressed. (R459)
 - **AC-RHD-04** - When the save fails, the previous day is restored with the other defaults and the card's existing error line shows. (R459)
 - **AC-RHD-05** - For a user who is not an editor the select is disabled and "Save defaults" is not shown. (R459)
+- **AC-RHD-70** - For a user who is not an editor, the card's select and time fields look disabled: dimmed, with a not-allowed cursor. (R459)
 - **AC-RHD-06** - A church's saved default day is still there after the organization reloads. (R459)
 - **AC-RHD-07** - A church with no saved default day reads as None. (R459)
 - **AC-RHD-67** - After an in-place switch to another church, the card shows that church's saved default day, default times and report time, and "Save defaults" writes those values, not the previous church's. (R459)
@@ -103,6 +104,7 @@ The marker is internal. In the Times tab an auto-added rehearsal looks like any 
 - **AC-RHD-41** - When the service already has a rehearsal on the default date, the add form's Date is blank. (R464)
 - **AC-RHD-42** - When no default day is set, or the service has no real date, the add form's Date is blank. (R464)
 - **AC-RHD-43** - When a default day is set but no default time, the Date is filled and the Time stays blank, and Add stays off until a time is entered. (R464)
+- **AC-RHD-71** - While the Date holds a real date and the Time is blank, the Time field has the amber border the Times tab uses for a missing value. It returns to the normal border once a time is entered, and it is never amber while the Date is blank. (R464)
 - **AC-RHD-44** - A date the planner has typed or cleared stays until they add the rehearsal. (R464)
 - **AC-RHD-45** - A date the planner has not touched follows the service date and the Settings day as they change. (R464)
 - **AC-RHD-46** - After "Add rehearsal" the Date returns to the default date, or to blank when that date now holds the rehearsal just added. (R464)
@@ -123,7 +125,7 @@ The marker is internal. In the Times tab an auto-added rehearsal looks like any 
 
 - The service falls on the default day: the rehearsal is that same day (AC-RHD-13, AC-RHD-18).
 - The rehearsal date is already in the past: it is still added, and a planner can remove it (AC-RHD-20).
-- A default day with no default time: no rehearsal is added, and the add form still fills the date (AC-RHD-23, AC-RHD-43).
+- A default day with no default time: no rehearsal is added, and the add form still fills the date, with the blank Time marked as missing (AC-RHD-23, AC-RHD-43, AC-RHD-71).
 - The first default time is blank or malformed: no rehearsal is added (AC-RHD-66).
 - The service date is not a real date: nothing is worked out from it (AC-RHD-16, AC-RHD-24, AC-RHD-35, AC-RHD-42).
 - Several default times: the first in stored order is used (AC-RHD-19).
@@ -134,7 +136,7 @@ The marker is internal. In the Times tab an auto-added rehearsal looks like any 
 - An edit was rejected: auto-moving continues (AC-RHD-30).
 - The Settings day changed after creation: the rehearsal keeps its own weekday (AC-RHD-28).
 - The service already has a rehearsal on the default date: the add form's date stays blank (AC-RHD-41, AC-RHD-46).
-- A viewer, or a locked service: nothing changes (AC-RHD-05, AC-RHD-36).
+- A viewer, or a locked service: nothing changes, and a viewer's Settings controls look disabled (AC-RHD-05, AC-RHD-36, AC-RHD-70).
 - Another service owns the page on the old date: it stays (AC-RHD-61).
 - Two services share a date and the one on the page moves: the other has no date page until its next save, and its regular share link is unaffected (AC-RHD-68).
 - The new page could not be written: the old page stays (AC-RHD-58).
