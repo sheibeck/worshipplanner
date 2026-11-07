@@ -495,6 +495,28 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     expect(wrapper.find('[data-testid="save-rehearsal-defaults-btn"]').exists()).toBe(false)
   })
 
+  it('dims the select and the time fields for a non-editor (AC-RHD-70)', () => {
+    const savedTimes = mockRehearsalTimeDefaults
+    try {
+      mockIsEditor = false
+      mockRehearsalTimeDefaults = ['18:30']
+      const wrapper = mountSettingsView()
+      const controls = [
+        daySelect(wrapper),
+        wrapper.get('[data-testid="rehearsal-default-time-0"]'),
+        wrapper.get('[data-testid="report-time-default-input"]'),
+      ]
+      for (const control of controls) {
+        expect((control.element as HTMLInputElement | HTMLSelectElement).disabled).toBe(true)
+        expect(control.classes()).toEqual(
+          expect.arrayContaining(['disabled:opacity-60', 'disabled:cursor-not-allowed']),
+        )
+      }
+    } finally {
+      mockRehearsalTimeDefaults = savedTimes
+    }
+  })
+
   it('hands the store only settings.* keys and does no direct write when the defaults are saved', async () => {
     const wrapper = mountSettingsView()
     await chooseDay(wrapper, 4)

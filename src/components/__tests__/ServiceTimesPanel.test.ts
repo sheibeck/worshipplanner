@@ -450,6 +450,25 @@ describe('ServiceTimesPanel — Phase 147 default date', () => {
     expect(btn.attributes('disabled')).toBeUndefined()
   })
 
+  it('marks a blank Time as missing only while the Date holds a real date (AC-RHD-71)', async () => {
+    const MISSING = 'border-amber-700'
+    const wrapper = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: [] })
+    const timeClasses = () => wrapper.get(TIME).classes()
+    expect(timeClasses()).toContain(MISSING)
+    await wrapper.get(TIME).setValue('19:00')
+    expect(timeClasses()).not.toContain(MISSING)
+    expect(timeClasses()).toContain('border-gray-700')
+    await wrapper.get(TIME).setValue('')
+    expect(timeClasses()).toContain(MISSING)
+    await wrapper.get(DATE).setValue('')
+    expect(timeClasses()).not.toContain(MISSING)
+    expect(timeClasses()).toContain('border-gray-700')
+
+    const noDefaultDay = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultTimes: [] })
+    expect(value(noDefaultDay, DATE)).toBe('')
+    expect(noDefaultDay.get(TIME).classes()).not.toContain(MISSING)
+  })
+
   it('keeps a date the planner typed or cleared when the service date changes (AC-RHD-44)', async () => {
     const typed = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
     await typed.get(DATE).setValue('2026-11-10')
